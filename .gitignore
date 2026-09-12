@@ -1,0 +1,37 @@
+# dependencies
+node_modules/
+.pnp/
+.pnp.js
+
+# build output
+dist/
+*.tsbuildinfo
+
+# playwright
+playwright-report/
+blob-report/
+test-results/
+.cache/
+playwright/.cache/
+
+# env
+.env
+.env.*
+!.env.example
+
+# editors / os
+.vscode/*
+!.vscode/extensions.json
+!.vscode/launch.json
+.idea/
+.DS_Store
+Thumbs.db
+
+# logs
+*.log
+npm-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# coverage
+coverage/
