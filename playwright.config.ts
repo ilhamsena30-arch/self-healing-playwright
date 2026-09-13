@@ -75,7 +75,13 @@ export default defineConfig({
 
   reporter: [
     ['list'],
-    ['html', { outputFolder: 'playwright-report', open: env.reportOpen as 'always' | 'never' | 'on-failure' }],
+    [
+      'html',
+      {
+        outputFolder: 'playwright-report',
+        open: env.reportOpen as 'always' | 'never' | 'on-failure',
+      },
+    ],
     ['json', { outputFile: 'test-results/results.json' }],
   ],
 });

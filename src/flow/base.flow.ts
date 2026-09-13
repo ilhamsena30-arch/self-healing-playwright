@@ -59,12 +59,19 @@ export abstract class BaseFlow {
   protected async loginViaApi(credentials: Credentials, cacheKey = 'current'): Promise<string> {
     this.log.info(`logging in via API as ${credentials.username}`);
     const token = await this.api.auth.loginAndGetToken(credentials);
-    await sessionStore.set(cacheKey, { token, username: credentials.username, createdAt: Date.now() }, { ttl: 600 });
+    await sessionStore.set(
+      cacheKey,
+      { token, username: credentials.username, createdAt: Date.now() },
+      { ttl: 600 },
+    );
     return token;
   }
 
   /** Reads a cached token from Redis, refreshing it via API if absent/expired. */
-  protected async getOrCreateToken(credentials: Credentials, cacheKey = 'current'): Promise<string> {
+  protected async getOrCreateToken(
+    credentials: Credentials,
+    cacheKey = 'current',
+  ): Promise<string> {
     const cached = await sessionStore.get<{ token: string }>(cacheKey);
     if (cached?.token) {
       this.log.debug(`reusing cached token for ${credentials.username}`);

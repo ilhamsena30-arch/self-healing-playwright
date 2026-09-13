@@ -2,15 +2,15 @@
 
 A layered Playwright + TypeScript automation boilerplate covering:
 
-| Layer | Purpose | Location |
-| --- | --- | --- |
-| **Flow** | Business logic & outcome assertions | `src/flow` |
-| **ScreenPage** | Locators + low-level element actions | `src/screen` |
-| **API** | REST calls via Playwright `APIRequestContext` | `src/api` |
-| **Redis** | Test data cache / session seeding (`@upstash/redis`) | `src/redis` |
-| **Core** | Env config, logging, base classes, constants | `src/core` |
-| **Fixtures** | Playwright fixtures wiring everything together | `src/fixtures` |
-| **Specs** | Test cases | `tests` |
+| Layer          | Purpose                                              | Location       |
+| -------------- | ---------------------------------------------------- | -------------- |
+| **Flow**       | Business logic & outcome assertions                  | `src/flow`     |
+| **ScreenPage** | Locators + low-level element actions                 | `src/screen`   |
+| **API**        | REST calls via Playwright `APIRequestContext`        | `src/api`      |
+| **Redis**      | Test data cache / session seeding (`@upstash/redis`) | `src/redis`    |
+| **Core**       | Env config, logging, base classes, constants         | `src/core`     |
+| **Fixtures**   | Playwright fixtures wiring everything together       | `src/fixtures` |
+| **Specs**      | Test cases                                           | `tests`        |
 
 > All target URLs, credentials, and selectors are **placeholders** (`example.com`, `tester@example.com`).
 > Replace them in `.env`, `src/data/test-data.ts`, and the screen objects.
@@ -42,8 +42,8 @@ src/
 Spec  →  Flow  →  ScreenPage (locators) + ApiClient + RedisHelper
 ```
 
-1. **ScreenPage** knows *how* to find elements and type/click them.
-2. **Flow** knows *what* steps form a business scenario, and asserts outcomes.
+1. **ScreenPage** knows _how_ to find elements and type/click them.
+2. **Flow** knows _what_ steps form a business scenario, and asserts outcomes.
 3. **API layer** seeds or verifies data without the browser.
 4. **Redis layer** caches sessions/entities for cross-test reuse and isolation.
 
@@ -124,7 +124,7 @@ await redis.get('foo');
 import { sessionStore, cartStore } from '../src/redis/index.js';
 
 await sessionStore.set('current', { token }, { ttl: 600 });
-const cached = await sessionStore.get<{ token: string }>('current');  // auto-deserialised
+const cached = await sessionStore.get<{ token: string }>('current'); // auto-deserialised
 await cartStore.clearNamespace();
 ```
 
@@ -141,16 +141,16 @@ const item = await flows.item.seedViaApiThenVerifyInUi({ name: 'seeded', price: 
 
 See `.env.example` for the full list with defaults. Key ones:
 
-| Variable | Default | Notes |
-| --- | --- | --- |
-| `BASE_URL` | `https://example.com` | UI target — replace |
-| `API_BASE_URL` | `https://api.example.com` | API target — replace |
-| `TEST_USERNAME` / `TEST_PASSWORD` | placeholders | Test account |
-| `REDIS_URL` | `https://fluent-worm-177361.upstash.io` | Upstash REST URL |
-| `REDIS_TOKEN` | *(empty)* | **Set via env/CI secrets — never commit** |
-| `REDIS_KEY_PREFIX` | `e2e` | All test keys are namespaced with this |
-| `REDIS_FLUSH_ON_START` | `false` | Wipe `e2e:*` keys during global setup |
-| `WORKERS` / `RETRIES` / `TIMEOUT_MS` | `2` / `1` / `45000` | Runner tuning |
+| Variable                             | Default                                 | Notes                                     |
+| ------------------------------------ | --------------------------------------- | ----------------------------------------- |
+| `BASE_URL`                           | `https://example.com`                   | UI target — replace                       |
+| `API_BASE_URL`                       | `https://api.example.com`               | API target — replace                      |
+| `TEST_USERNAME` / `TEST_PASSWORD`    | placeholders                            | Test account                              |
+| `REDIS_URL`                          | `https://fluent-worm-177361.upstash.io` | Upstash REST URL                          |
+| `REDIS_TOKEN`                        | _(empty)_                               | **Set via env/CI secrets — never commit** |
+| `REDIS_KEY_PREFIX`                   | `e2e`                                   | All test keys are namespaced with this    |
+| `REDIS_FLUSH_ON_START`               | `false`                                 | Wipe `e2e:*` keys during global setup     |
+| `WORKERS` / `RETRIES` / `TIMEOUT_MS` | `2` / `1` / `45000`                     | Runner tuning                             |
 
 Config is validated at startup with Zod — an invalid `.env` fails fast with a readable error.
 
@@ -158,14 +158,14 @@ Config is validated at startup with Zod — an invalid `.env` fails fast with a 
 
 ## Notes on Redis isolation (Upstash)
 
-* Backed by `@upstash/redis` over HTTP — no local server, no connect/quit lifecycle.
-* Credentials come from the environment: `REDIS_URL` (REST URL) and `REDIS_TOKEN`
+- Backed by `@upstash/redis` over HTTP — no local server, no connect/quit lifecycle.
+- Credentials come from the environment: `REDIS_URL` (REST URL) and `REDIS_TOKEN`
   (REST token). The token is intentionally left empty in `.env.example`; supply it
   via your shell or CI secrets.
-* Every helper is namespaced: `e2e:session:current`, `e2e:cart:item:42`, …
-* The `redis` fixture clears its namespace **after** each test.
-* `REDIS_FLUSH_ON_START=true` wipes all `e2e:*` keys once per run.
-* Redis is **optional** — without `REDIS_TOKEN`, global setup skips the health
+- Every helper is namespaced: `e2e:session:current`, `e2e:cart:item:42`, …
+- The `redis` fixture clears its namespace **after** each test.
+- `REDIS_FLUSH_ON_START=true` wipes all `e2e:*` keys once per run.
+- Redis is **optional** — without `REDIS_TOKEN`, global setup skips the health
   check and API-only suites still run.
 
 ```ts
@@ -178,6 +178,46 @@ await redis.get('foo');
 
 ## Reporting
 
-* `playwright-report/` — HTML report (`npm run report`)
-* `test-results/results.json` — machine-readable results
-* Traces, videos, and screenshots are retained on failure.
+- `playwright-report/` — HTML report (`npm run report`)
+- `test-results/results.json` — machine-readable results
+- `self-healing-report.json` — audit log of every successful Tier-3 locator repair
+  (original selector, repaired selector, confidence, reasoning, timestamp)
+- Traces, videos, and screenshots are retained on failure.
+
+## Self-healing locators (4-tier)
+
+Interactive locator calls can heal themselves without touching `expect()` assertions.
+
+| Tier | What happens                                                                               |
+| ---- | ------------------------------------------------------------------------------------------ |
+| 1    | Primary selector runs with a fast 2.5s timeout (fail fast).                                |
+| 2    | Redis `healed_locators` hash is checked for a cached replacement (memory fallback).        |
+| 3    | DOM is pruned to interactive elements and DeepSeek proposes a repaired selector.           |
+| 4    | A confident repair (>= 0.8) is cached to Redis and appended to `self-healing-report.json`. |
+
+Only `click`, `fill`, `type`, and `selectOption` are intercepted. Assertions are
+never modified — a true business regression still fails loudly.
+
+```ts
+// Existing specs only change their import:
+import { test, expect } from '../../src/fixtures/selfHealingFixture.js';
+
+test('uses the healing page', async ({ healedPage }) => {
+  await healedPage.getByRole('button', { name: /log ?in/i }).click();
+});
+```
+
+Configuration (via `.env`):
+
+| Variable                       | Default       | Notes                                                                                                  |
+| ------------------------------ | ------------- | ------------------------------------------------------------------------------------------------------ |
+| `HEALING_REDIS_URL`            | _(derived)_   | ioredis URI; falls back to `upstash://…` from `REDIS_URL`+`REDIS_TOKEN`, then `redis://localhost:6379` |
+| `HEALING_REDIS_PASSWORD`       | _(empty)_     | password for the local Redis fallback                                                                  |
+| `DEEPSEEK_API_KEY`             | _(empty)_         | empty disables Tier 3/4                                                                                |
+| `DEEPSEEK_MODEL`               | `deepseek-chat`   | model used for semantic repair                                                                         |
+| `DEEPSEEK_BASE_URL`            | `https://api.deepseek.com` | DeepSeek is OpenAI-compatible; the `openai` SDK targets this URL                             |
+| `HEALING_CONFIDENCE_THRESHOLD` | `0.8`         | minimum confidence to auto-apply a repair                                                              |
+| `HEALING_TIMEOUT_MS`           | `2500`        | fail-fast timeout per attempt                                                                          |
+
+Redis is optional: if the connection fails or is unconfigured, healing degrades
+to the in-memory cache + LLM without crashing the run.

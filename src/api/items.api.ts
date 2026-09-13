@@ -6,7 +6,9 @@ import type { CatalogItem, CreateItemPayload, Paginated } from './types.js';
 export class ItemsApi {
   constructor(private readonly client: ApiClient) {}
 
-  list(params: { page?: number; pageSize?: number; search?: string } = {}): Promise<ApiResponse<Paginated<CatalogItem>>> {
+  list(
+    params: { page?: number; pageSize?: number; search?: string } = {},
+  ): Promise<ApiResponse<Paginated<CatalogItem>>> {
     return this.client.get<Paginated<CatalogItem>>(API_ROUTES.items, { params });
   }
 

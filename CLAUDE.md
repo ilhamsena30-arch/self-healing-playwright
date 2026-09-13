@@ -8,13 +8,13 @@ keep the suite self-healing.
 
 ## Stack
 
-| | |
-| --- | --- |
-| Runtime | Node >= 20, ESM (`"type": "module"`) |
-| Language | TypeScript strict, `moduleResolution: NodeNext` |
-| Runner | Playwright Test — projects `chromium`, `firefox`, `api` |
-| Config | `src/core/env.ts` validates `.env` with Zod and exposes the typed `env` object |
-| Data | Upstash Redis over HTTP (`src/redis`) — optional, no local server |
+|          |                                                                                |
+| -------- | ------------------------------------------------------------------------------ |
+| Runtime  | Node >= 20, ESM (`"type": "module"`)                                           |
+| Language | TypeScript strict, `moduleResolution: NodeNext`                                |
+| Runner   | Playwright Test — projects `chromium`, `firefox`, `api`                        |
+| Config   | `src/core/env.ts` validates `.env` with Zod and exposes the typed `env` object |
+| Data     | Upstash Redis over HTTP (`src/redis`) — optional, no local server              |
 
 - **Import `env`, never `process.env`.** Every variable is declared in `src/core/env.ts`; add yours
   there and it becomes typed everywhere.
@@ -44,14 +44,14 @@ The spec suffix is load-bearing: the `api` project is selected by `testMatch: /.
 and the browser projects ignore that pattern. A browser spec named `*.api.spec.ts` runs in the wrong
 project.
 
-| Adding… | Touch |
-| --- | --- |
-| an element or action on an existing screen | `src/screen/<name>.screen.ts` |
-| a screen | new ScreenPage + one field in `Screens` (`src/screen/index.ts`) |
-| a business scenario | `src/flow/<name>.flow.ts` + one field in the `flows` fixture |
-| an endpoint | `src/api/<name>.api.ts` + one field in `ApiFactory` |
-| a route, constant, or Redis namespace | `src/core/constants.ts` |
-| reusable test data | `src/data/test-data.ts` |
+| Adding…                                    | Touch                                                           |
+| ------------------------------------------ | --------------------------------------------------------------- |
+| an element or action on an existing screen | `src/screen/<name>.screen.ts`                                   |
+| a screen                                   | new ScreenPage + one field in `Screens` (`src/screen/index.ts`) |
+| a business scenario                        | `src/flow/<name>.flow.ts` + one field in the `flows` fixture    |
+| an endpoint                                | `src/api/<name>.api.ts` + one field in `ApiFactory`             |
+| a route, constant, or Redis namespace      | `src/core/constants.ts`                                         |
+| reusable test data                         | `src/data/test-data.ts`                                         |
 
 ## Self-healing rules
 
@@ -115,15 +115,15 @@ clean.
 
 ## How to run a test
 
-| Intent | Command |
-| --- | --- |
-| One file | `npx playwright test tests/ui/login.ui.spec.ts` |
-| One test by title | `npx playwright test -g "sign in"` |
-| One browser, headed | `npm run test:headed` |
-| API suite | `npm run test:api` |
-| Tagged smoke suite | `npm run test:smoke` |
-| Step through with the inspector | `npm run test:debug` |
-| Everything | `npm test` |
+| Intent                          | Command                                         |
+| ------------------------------- | ----------------------------------------------- |
+| One file                        | `npx playwright test tests/ui/login.ui.spec.ts` |
+| One test by title               | `npx playwright test -g "sign in"`              |
+| One browser, headed             | `npm run test:headed`                           |
+| API suite                       | `npm run test:api`                              |
+| Tagged smoke suite              | `npm run test:smoke`                            |
+| Step through with the inspector | `npm run test:debug`                            |
+| Everything                      | `npm test`                                      |
 
 - `--project=chromium\|firefox\|api` picks the target; the table's scripts are the common cases and
   `package.json` has the rest.
