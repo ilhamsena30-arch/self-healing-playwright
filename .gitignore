@@ -35,3 +35,5 @@ pnpm-debug.log*
 
 # coverage
 coverage/
+# Playwright CLI output (may contain credentials)
+.playwright-cli/
