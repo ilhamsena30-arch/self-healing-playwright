@@ -18,6 +18,7 @@
     "test:headed": "playwright test --project=chromium --headed",
     "test:debug": "playwright test --project=chromium --debug",
     "test:smoke": "playwright test --grep @smoke",
+    "test:unit": "node --import tsx --test tests/unit/*.unit.spec.ts",
     "report": "playwright show-report",
     "redis:ping": "tsx scripts/redis-ping.ts",
     "seed": "tsx scripts/seed-redis.ts"

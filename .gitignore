@@ -40,3 +40,4 @@ coverage/
 
 # self-healing audit log (regenerated each run)
 self-healing-report.json
+self-healing-report.jsonl

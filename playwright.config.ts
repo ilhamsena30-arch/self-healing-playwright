@@ -53,12 +53,22 @@ export default defineConfig({
     {
       name: 'chromium',
       use: { ...devices['Desktop Chrome'] },
-      testIgnore: [/global\.setup\.ts/, /global\.teardown\.ts/, /.*\.api\.spec\.ts/],
+      testIgnore: [
+        /global\.setup\.ts/,
+        /global\.teardown\.ts/,
+        /.*\.api\.spec\.ts/,
+        /.*\.unit\.spec\.ts/,
+      ],
     },
     {
       name: 'firefox',
       use: { ...devices['Desktop Firefox'] },
-      testIgnore: [/global\.setup\.ts/, /global\.teardown\.ts/, /.*\.api\.spec\.ts/],
+      testIgnore: [
+        /global\.setup\.ts/,
+        /global\.teardown\.ts/,
+        /.*\.api\.spec\.ts/,
+        /.*\.unit\.spec\.ts/,
+      ],
     },
     {
       name: 'api',

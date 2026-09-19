@@ -57,6 +57,13 @@ const envSchema = z.object({
   DEEPSEEK_BASE_URL: z.string().default('https://api.deepseek.com'),
   HEALING_CONFIDENCE_THRESHOLD: z.coerce.number().min(0).max(1).default(0.8),
   HEALING_TIMEOUT_MS: z.coerce.number().int().positive().default(2_500),
+  // `deepseek` uses the real LLM; `stub` returns a deterministic queued repair so
+  // CI can exercise Tiers 2-4 with no network and no tokens.
+  HEALING_PROVIDER: z.enum(['deepseek', 'stub']).default('deepseek'),
+  HEALING_STUB_SELECTOR: z.string().default(''),
+  HEALING_STUB_CONFIDENCE: z.coerce.number().min(0).max(1).default(0.95),
+  // Per-key expiry for the healing cache. 0 or -1 disables expiry (D3).
+  HEALING_CACHE_TTL_SECONDS: z.coerce.number().int().default(604_800),
 
   // --- Reporting ---
   REPORT_OPEN: z.enum(['always', 'never', 'on-failure']).default('never'),
@@ -112,6 +119,10 @@ export const env = {
     deepseekBaseUrl: raw.DEEPSEEK_BASE_URL.replace(/\/+$/, ''),
     confidenceThreshold: raw.HEALING_CONFIDENCE_THRESHOLD,
     timeoutMs: raw.HEALING_TIMEOUT_MS,
+    provider: raw.HEALING_PROVIDER,
+    stubSelector: raw.HEALING_STUB_SELECTOR,
+    stubConfidence: raw.HEALING_STUB_CONFIDENCE,
+    cacheTtlSeconds: raw.HEALING_CACHE_TTL_SECONDS,
   },
 } as const;
 

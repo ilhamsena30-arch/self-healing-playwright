@@ -23,10 +23,14 @@ export class LoginScreen extends ScreenPage {
   constructor(page: Page) {
     super(page);
     this.readyLocator = page.getByTestId('login-form');
-    this.heading = page.getByRole('heading', { name: /sign in|log in/i });
-    this.usernameInput = page.getByLabel(/username|email/i);
-    this.passwordInput = page.getByLabel(/password/i);
-    this.submitButton = page.getByRole('button', { name: /sign in|log in/i });
+    this.heading = page.getByRole('heading', { name: /sign in|log in/i }).or(page.locator('h1'));
+    this.usernameInput = page
+      .getByLabel(/username|email/i)
+      .or(page.getByPlaceholder(/username|email/i));
+    this.passwordInput = page.getByLabel(/password/i).or(page.getByPlaceholder(/password/i));
+    this.submitButton = page
+      .getByRole('button', { name: /sign in|log in/i })
+      .or(page.locator('#login'));
     this.errorBanner = page.getByTestId('login-error');
     this.rememberMeCheckbox = page.getByLabel(/remember me/i);
     this.forgotPasswordLink = page.getByRole('link', { name: /forgot password/i });

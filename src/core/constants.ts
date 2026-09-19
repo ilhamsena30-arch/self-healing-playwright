@@ -22,14 +22,12 @@ export const TIMEOUTS = {
 
 /** Self-healing runtime tuning. */
 export const SELF_HEALING = {
-  /** Fast-fail timeout applied to each healing attempt (Tier 1-3). */
-  attemptTimeoutMs: 2_500,
-  /** Redis hash holding `failed selector -> healed selector` mappings. */
-  redisKey: 'healed_locators',
-  /** Local run log produced by the report writer. */
-  reportFile: 'self-healing-report.json',
+  /** Bump to invalidate every cached heal at once (gate/prompt change). */
+  cacheVersion: 1,
+  /** Local run log produced by the report writer (append-only NDJSON). */
+  reportFile: 'self-healing-report.jsonl',
   /** Interactive methods that are intercepted for healing. */
-  interactiveMethods: ['click', 'fill', 'type', 'selectOption'] as const,
+  interactiveMethods: ['click', 'fill', 'type', 'selectOption', 'waitFor'] as const,
 } as const;
 
 /** Redis key namespaces (prefix is applied by the RedisHelper). */

@@ -4,13 +4,16 @@ import { env } from '../core/env.js';
 import { createLogger, type Logger } from '../core/logger.js';
 
 /**
- * LLM semantic-repair client (Tier 3).
+ * Repair provider abstraction (D13).
  *
- * Sends the failed selector plus a pruned DOM snippet to DeepSeek and asks for a
- * replacement Playwright selector. DeepSeek exposes an OpenAI-compatible API, so
- * the official `openai` SDK is reused with a custom base URL rather than adding a
- * second HTTP client. The response is requested as JSON and validated with Zod,
- * then the caller applies the guardrail (confidence >= threshold, non-null selector).
+ * Tier 3 asks a provider for a repaired selector string. Two implementations:
+ *   - `deepseek` — the real LLM via the OpenAI-compatible DeepSeek endpoint.
+ *   - `stub`     — deterministic, offline: returns the queued repair so CI can
+ *                  exercise Tiers 2-4 with no network and no tokens.
+ *
+ * Providers return `null` on any failure (or when unconfigured) so the fixture
+ * can surface the original Playwright error instead of masking it with a
+ * secondary one. Providers never return a `getBy*` call — only a selector STRING.
  */
 
 export interface RepairResult {
@@ -19,17 +22,23 @@ export interface RepairResult {
   confidence: number;
 }
 
-const log: Logger = createLogger('healing:llm');
+export interface RepairProvider {
+  readonly name: string;
+  repair(failedSelector: string, prunedDom: string): Promise<RepairResult | null>;
+}
 
-/** Zod schema mirroring the required LLM output contract. */
+const log: Logger = createLogger('healing:provider');
+
+// ---------------------------------------------------------------------------
+// DeepSeek provider
+// ---------------------------------------------------------------------------
+
 const repairSchema = z.object({
   reasoning: z.string(),
   repaired_selector: z.string().nullable(),
   confidence: z.number().min(0).max(1),
 });
 
-// DeepSeek has no `json_schema` structured-output mode, so the exact shape is
-// spelled out here and enforced by Zod after parsing.
 const SYSTEM_PROMPT = `You repair broken Playwright locators for a test-automation suite.
 Given (1) the selector that failed to resolve and (2) a pruned snapshot of the page's interactive DOM, produce a corrected Playwright selector.
 Rules:
@@ -44,10 +53,7 @@ Example response:
 
 let client: OpenAI | null = null;
 
-/**
- * Lazily constructs the DeepSeek client; returns null when no key is configured.
- * DeepSeek is OpenAI-compatible, so the OpenAI SDK talks to it via `baseURL`.
- */
+/** Lazily constructs the DeepSeek client; returns null when no key is configured. */
 function getClient(): OpenAI | null {
   if (client) return client;
   if (!env.healing.deepseekApiKey) return null;
@@ -58,16 +64,12 @@ function getClient(): OpenAI | null {
   return client;
 }
 
+/** True when a DeepSeek API key is configured (kept for the fixture's diagnostics). */
 export function isLlmConfigured(): boolean {
   return env.healing.deepseekApiKey.trim().length > 0;
 }
 
-/**
- * Calls the LLM for a repaired selector. Returns `null` on any failure
- * (network, auth, schema mismatch) so the fixture can surface the original
- * Playwright error instead of masking it with a secondary one.
- */
-export async function repairSelector(
+async function repairWithDeepseek(
   failedSelector: string,
   prunedDom: string,
 ): Promise<RepairResult | null> {
@@ -90,9 +92,6 @@ export async function repairSelector(
         { role: 'system', content: SYSTEM_PROMPT },
         { role: 'user', content: userPrompt },
       ],
-      // DeepSeek supports JSON mode but not OpenAI's `json_schema` structured
-      // outputs; the exact shape is described in the prompt and Zod-validated
-      // below.
       response_format: { type: 'json_object' },
     });
 
@@ -106,7 +105,53 @@ export async function repairSelector(
       confidence: parsed.confidence,
     };
   } catch (error) {
-    log.warn(`LLM repair failed: ${error instanceof Error ? error.message : String(error)}`);
+    log.warn(`deepseek repair failed: ${error instanceof Error ? error.message : String(error)}`);
     return null;
   }
+}
+
+// ---------------------------------------------------------------------------
+// Stub provider
+// ---------------------------------------------------------------------------
+
+async function repairWithStub(
+  failedSelector: string,
+  _prunedDom: string,
+): Promise<RepairResult | null> {
+  if (!env.healing.stubSelector) return null;
+  log.debug(`stub provider returning queued repair for "${failedSelector}"`);
+  return {
+    reasoning: 'stub',
+    repairedSelector: env.healing.stubSelector,
+    confidence: env.healing.stubConfidence,
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Selection
+// ---------------------------------------------------------------------------
+
+const providers: Record<string, RepairProvider> = {
+  deepseek: { name: 'deepseek', repair: repairWithDeepseek },
+  stub: { name: 'stub', repair: repairWithStub },
+};
+
+/** The provider selected by `HEALING_PROVIDER` (default `deepseek`). */
+export function getProvider(): RepairProvider {
+  return providers[env.healing.provider] ?? providers.deepseek;
+}
+
+/** Tier 3 entry point: returns a repair or `null` (never throws). */
+export async function repairSelector(
+  failedSelector: string,
+  prunedDom: string,
+): Promise<RepairResult | null> {
+  const provider = getProvider();
+  return provider.repair(failedSelector, prunedDom);
+}
+
+/** The model/name to record against a heal (report + cache). */
+export function providerName(): string {
+  const provider = getProvider();
+  return provider.name === 'deepseek' ? env.healing.deepseekModel : provider.name;
 }

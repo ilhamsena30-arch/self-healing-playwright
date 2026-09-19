@@ -25,8 +25,18 @@ export interface PrunedElement {
 
 const PRUNE_SCRIPT = `() => {
   const INTERACTIVE = new Set(['button', 'a', 'input', 'select', 'textarea']);
-  const KEEP_ATTRS = ['id', 'class', 'name', 'aria-label', 'role', 'type', 'href', 'placeholder', 'value'];
+  // value is deliberately absent (D14): credentials typed into a form must
+  // never leave the machine on an external API call.
+  const KEEP_ATTRS = ['id', 'class', 'name', 'aria-label', 'role', 'type', 'href', 'placeholder'];
   const SKIP_TAGS = new Set(['script', 'style', 'svg', 'path', 'noscript', 'template', 'head', 'link', 'meta', 'title']);
+
+  // Redact any attribute value that looks like a secret (D14).
+  function redact(name, value) {
+    if (name === 'id' || name === 'class' || name === 'role' || name === 'type') return value;
+    if (/password|secret|token|api[_-]?key|authorization/i.test(name)) return '[REDACTED]';
+    if (/^(password|passwd|secret|token)$/i.test(String(value ?? ''))) return '[REDACTED]';
+    return value;
+  }
 
   function visibleText(node) {
     // Direct text only — leaf labels matter for getByText/getByRole matching.
@@ -61,10 +71,10 @@ const PRUNE_SCRIPT = `() => {
     if (tag) out.tag = tag;
     if (node.hasAttribute('id')) out.id = node.getAttribute('id');
     if (node.hasAttribute('class')) out.class = node.getAttribute('class');
-    if (node.hasAttribute('name')) out.name = node.getAttribute('name');
+    if (node.hasAttribute('name')) out.name = redact('name', node.getAttribute('name'));
     if (node.hasAttribute('aria-label')) out.ariaLabel = node.getAttribute('aria-label');
     for (const a of Array.from(node.attributes || [])) {
-      if (a.name.startsWith('data-') || KEEP_ATTRS.includes(a.name)) out.attrs[a.name] = a.value;
+      if (a.name.startsWith('data-') || KEEP_ATTRS.includes(a.name)) out.attrs[a.name] = redact(a.name, a.value);
     }
     if (text) out.text = text;
     if (children.length) out.children = children;

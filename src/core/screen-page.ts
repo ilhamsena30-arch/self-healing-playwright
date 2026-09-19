@@ -77,13 +77,14 @@ export abstract class ScreenPage implements IScreen {
 
   protected async fill(locator: Locator, value: string, label?: string): Promise<void> {
     this.log.debug(`fill ${label ?? 'field'} = "${maskIfSecret(value)}"`);
-    await locator.waitFor({ state: 'visible' });
+    // Playwright auto-waits for actionability before acting, so no explicit
+    // waitFor here. An explicit `waitFor({state:'visible'})` would run on the
+    // real locator and throw before the healing proxy ever sees the action.
     await locator.fill(value);
   }
 
   protected async click(locator: Locator, label?: string): Promise<void> {
     this.log.debug(`click ${label ?? 'element'}`);
-    await locator.waitFor({ state: 'visible' });
     await locator.click();
   }
 

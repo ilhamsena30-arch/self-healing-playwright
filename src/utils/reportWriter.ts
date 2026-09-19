@@ -4,12 +4,19 @@ import { SELF_HEALING } from '../core/constants.js';
 import { createLogger, type Logger } from '../core/logger.js';
 
 /**
- * Appends self-healing repair events to a local JSON run log.
+ * Append-only NDJSON self-healing report (D1, D7).
  *
- * `self-healing-report.json` sits at the repo root and accumulates one entry per
- * successful Tier-3 repair. Writes are serialised through an in-process promise
- * chain so concurrent workers never interleave a half-written JSON array.
+ * One JSON line per event via `fs.appendFile`, which is parallel-safe by
+ * construction — the old read-modify-write JSON-array approach is what lost
+ * entries when workers ran concurrently. Every attempt is recorded: applied,
+ * rejected, and unverified.
  */
+
+export interface SuggestedPatch {
+  file: string | null;
+  before: string;
+  after: string;
+}
 
 export interface HealReportEntry {
   timestamp: string;
@@ -17,7 +24,14 @@ export interface HealReportEntry {
   originalSelector: string;
   repairedSelector: string;
   confidence: number;
+  /** false when the gate had no expectations to check (D4/D12). */
+  verified: boolean;
   reasoning: string;
+  applied: boolean;
+  reason?: string;
+  url: string;
+  model: string;
+  suggestedPatch?: SuggestedPatch;
 }
 
 const log: Logger = createLogger('healing:report');
@@ -28,42 +42,25 @@ const reportPath = path.join(process.cwd(), SELF_HEALING.reportFile);
 let writeQueue: Promise<void> = Promise.resolve();
 
 /**
- * Reads the existing report array, or returns [] when the file is absent/malformed.
- * A corrupt file is reset so a single bad write can never brick future reports.
+ * Appends a single event line. `flushHealReport` is called from teardown so
+ * buffered lines are never lost (D16).
  */
-async function readEntries(): Promise<HealReportEntry[]> {
-  try {
-    const raw = await fs.readFile(reportPath, 'utf8');
-    const parsed = JSON.parse(raw);
-    return Array.isArray(parsed) ? (parsed as HealReportEntry[]) : [];
-  } catch {
-    return [];
-  }
-}
-
-/** Appends a repair event and writes the whole array back atomically. */
 export function logHealEvent(entry: Omit<HealReportEntry, 'timestamp'>): void {
   const fullEntry: HealReportEntry = { ...entry, timestamp: new Date().toISOString() };
 
-  // Chain onto the previous write so parallel tests never corrupt the file.
   writeQueue = writeQueue.then(async () => {
-    const entries = await readEntries();
-    entries.push(fullEntry);
-    const tmp = `${reportPath}.tmp`;
-    await fs.writeFile(tmp, JSON.stringify(entries, null, 2), 'utf8');
-    await fs.rename(tmp, reportPath);
+    await fs.appendFile(reportPath, `${JSON.stringify(fullEntry)}\n`, 'utf8');
     log.info(
-      `heal logged: "${fullEntry.originalSelector}" -> "${fullEntry.repairedSelector}" (confidence ${fullEntry.confidence})`,
+      `heal logged (applied=${fullEntry.applied}, verified=${fullEntry.verified}): "${fullEntry.originalSelector}" -> "${fullEntry.repairedSelector}"`,
     );
   });
 
-  // Keep the chain alive even when a write fails.
   writeQueue = writeQueue.catch((error) => {
     log.warn(`failed to write self-healing report: ${String(error)}`);
   });
 }
 
-/** Resolves once all queued writes have settled (used by teardown). */
+/** Resolves once all queued writes have settled (used by teardown, D16). */
 export async function flushHealReport(): Promise<void> {
   await writeQueue;
 }

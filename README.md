@@ -180,44 +180,87 @@ await redis.get('foo');
 
 - `playwright-report/` — HTML report (`npm run report`)
 - `test-results/results.json` — machine-readable results
-- `self-healing-report.json` — audit log of every successful Tier-3 locator repair
-  (original selector, repaired selector, confidence, reasoning, timestamp)
+- `self-healing-report.jsonl` — append-only NDJSON audit log of every heal attempt
+  (applied, rejected, and unverified), one JSON object per line
 - Traces, videos, and screenshots are retained on failure.
 
 ## Self-healing locators (4-tier)
 
 Interactive locator calls can heal themselves without touching `expect()` assertions.
 
-| Tier | What happens                                                                               |
-| ---- | ------------------------------------------------------------------------------------------ |
-| 1    | Primary selector runs with a fast 2.5s timeout (fail fast).                                |
-| 2    | Redis `healed_locators` hash is checked for a cached replacement (memory fallback).        |
-| 3    | DOM is pruned to interactive elements and DeepSeek proposes a repaired selector.           |
-| 4    | A confident repair (>= 0.8) is cached to Redis and appended to `self-healing-report.json`. |
+| Tier | What happens                                                                                                |
+| ---- | ----------------------------------------------------------------------------------------------------------- |
+| 1    | Primary selector runs with a fail-fast timeout (`HEALING_TIMEOUT_MS`, default 2500).                        |
+| 2    | Namespaced Redis cache (`{prefix}:heal:{version}:{ENV}:{path}:{sha1}`) is checked.                          |
+| 3    | DOM is pruned to interactive elements and the provider (`deepseek` or `stub`) proposes a repaired selector. |
+| 4    | Verification gate checks confidence + uniqueness + semantic equivalence, then caches and reports.           |
 
-Only `click`, `fill`, `type`, and `selectOption` are intercepted. Assertions are
+`click`, `fill`, `type`, `selectOption`, and `waitFor` are intercepted. Assertions are
 never modified — a true business regression still fails loudly.
 
+### The verification gate
+
+A repair is **persisted only** if it passes all of (D2):
+
+1. confidence ≥ `HEALING_CONFIDENCE_THRESHOLD` (default 0.8),
+2. resolves to **exactly one** element,
+3. role matches the original selector, and
+4. name/text matches under normalised comparison — a name mismatch is accepted only
+   when the repaired element is the **only** element with that role.
+
+Three outcomes, and they are **not** interchangeable:
+
+- **verified** — expectations existed and were satisfied. Trusted.
+- **rejected** — expectations existed and were violated. The test **fails** (D11) with a
+  `healing-diagnostics.json` attachment containing the pruned DOM, the model's reasoning,
+  and the rejection reason.
+- **unverifiable** — the original selector had no parseable semantics (e.g. a bare CSS
+  id). The heal is cached but flagged `verified: false` and logged as a warning (D4).
+
+A rejected repair is **not** written to Redis. A wrong heal can never silently go green.
+
+### Opting in
+
+Healing is opt-in. The default `screens` fixture uses the raw page; the `healedScreens`
+fixture builds the same ScreenPages on the healing proxy:
+
 ```ts
-// Existing specs only change their import:
 import { test, expect } from '../../src/fixtures/selfHealingFixture.js';
 
-test('uses the healing page', async ({ healedPage }) => {
-  await healedPage.getByRole('button', { name: /log ?in/i }).click();
+test('uses the healing screens', async ({ healedScreens }) => {
+  await healedScreens.login.open();
+  await healedScreens.login.submit();
 });
 ```
 
-Configuration (via `.env`):
+`tests/ui/healing.ui.spec.ts` (tagged `@regression`) exercises the whole path offline via
+the stub provider.
 
-| Variable                       | Default       | Notes                                                                                                  |
-| ------------------------------ | ------------- | ------------------------------------------------------------------------------------------------------ |
-| `HEALING_REDIS_URL`            | _(derived)_   | ioredis URI; falls back to `upstash://…` from `REDIS_URL`+`REDIS_TOKEN`, then `redis://localhost:6379` |
-| `HEALING_REDIS_PASSWORD`       | _(empty)_     | password for the local Redis fallback                                                                  |
-| `DEEPSEEK_API_KEY`             | _(empty)_         | empty disables Tier 3/4                                                                                |
-| `DEEPSEEK_MODEL`               | `deepseek-chat`   | model used for semantic repair                                                                         |
-| `DEEPSEEK_BASE_URL`            | `https://api.deepseek.com` | DeepSeek is OpenAI-compatible; the `openai` SDK targets this URL                             |
-| `HEALING_CONFIDENCE_THRESHOLD` | `0.8`         | minimum confidence to auto-apply a repair                                                              |
-| `HEALING_TIMEOUT_MS`           | `2500`        | fail-fast timeout per attempt                                                                          |
+### Configuration
+
+| Variable                       | Default                    | Notes                                                                                                 |
+| ------------------------------ | -------------------------- | ----------------------------------------------------------------------------------------------------- |
+| `HEALING_REDIS_URL`            | _(derived)_                | ioredis URI; falls back to `rediss://…` from `REDIS_URL`+`REDIS_TOKEN`, then `redis://localhost:6379` |
+| `HEALING_REDIS_PASSWORD`       | _(empty)_                  | password for the local Redis fallback                                                                 |
+| `HEALING_PROVIDER`             | `deepseek`                 | `deepseek` (real LLM) or `stub` (deterministic, offline)                                              |
+| `HEALING_STUB_SELECTOR`        | _(empty)_                  | selector the stub provider returns                                                                    |
+| `HEALING_STUB_CONFIDENCE`      | `0.95`                     | confidence the stub provider reports                                                                  |
+| `HEALING_CACHE_TTL_SECONDS`    | `604800`                   | per-key cache TTL (7 days); `0`/`-1` disables expiry                                                  |
+| `DEEPSEEK_API_KEY`             | _(empty)_                  | empty disables the deepseek provider                                                                  |
+| `DEEPSEEK_MODEL`               | `deepseek-chat`            | model used for semantic repair                                                                        |
+| `DEEPSEEK_BASE_URL`            | `https://api.deepseek.com` | DeepSeek is OpenAI-compatible; the `openai` SDK targets this URL                                      |
+| `HEALING_CONFIDENCE_THRESHOLD` | `0.8`                      | minimum confidence to auto-apply a repair                                                             |
+| `HEALING_TIMEOUT_MS`           | `2500`                     | fail-fast timeout per attempt                                                                         |
 
 Redis is optional: if the connection fails or is unconfigured, healing degrades
-to the in-memory cache + LLM without crashing the run.
+to the in-memory cache without crashing the run. The cache is cleared once in
+global setup; the TTL is a leak backstop for runs that die before teardown.
+
+```bash
+# Offline verification — no network, no tokens:
+HEALING_PROVIDER=stub HEALING_STUB_SELECTOR="button[name='submit-login']" \
+  npx playwright test tests/ui/healing.ui.spec.ts --project=chromium
+```
+
+Unit tests for the gate and the cache-key builder run with `npm run test:unit`
+(`node:test` + `tsx`, no browser).

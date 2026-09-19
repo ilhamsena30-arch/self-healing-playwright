@@ -79,6 +79,12 @@ project.
    and make the next failure harder to read.
 4. **Prove the heal on the failing spec.** Re-run that file, then the project. A heal no failing spec
    verifies is a guess.
+5. **Runtime self-healing is repair-and-report, never auto-fix.** The LLM/stub runs during the run,
+   caches a verified repair, and writes a `suggestedPatch` into `self-healing-report.jsonl` — it
+   **never** edits `src/screen`. A repair that fails the verification gate **fails the test**
+   (rejected), and a repair with no parseable semantics is cached but flagged `verified: false`
+   (unverifiable). Rejected ≠ unverifiable. The `healedScreens` fixture is opt-in; the default
+   `screens` fixture keeps using the raw page.
 
 ## How to write a test
 
@@ -122,6 +128,7 @@ clean.
 | One browser, headed             | `npm run test:headed`                           |
 | API suite                       | `npm run test:api`                              |
 | Tagged smoke suite              | `npm run test:smoke`                            |
+| Unit tests (gate + cache keys)  | `npm run test:unit`                             |
 | Step through with the inspector | `npm run test:debug`                            |
 | Everything                      | `npm test`                                      |
 
@@ -188,7 +195,10 @@ cp .env.example .env          # .env is git-ignored — never commit it
 ## Definition of done
 
 - [ ] `npm run typecheck` and `npm run lint` are clean.
+- [ ] `npm run test:unit` passes (gate + cache-key builder).
 - [ ] The changed spec passes in isolation, then in its project.
 - [ ] No locator strings outside `src/screen`; new screens and flows wired into `Screens` and `Flows`.
 - [ ] Every `describe` carries a `@smoke` / `@regression` / `@api` tag.
 - [ ] Comments explain the why; the code itself carries the what.
+- [ ] A rejected self-healing repair fails the test (never silently green); an unverifiable one is
+      flagged `verified: false`.
