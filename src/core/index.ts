@@ -21,12 +21,20 @@ export async function waitForCondition(
     }
     await new Promise((resolve) => setTimeout(resolve, interval));
   }
-  throw new Error(`Timed out after ${timeout}ms waiting for: ${message}${last ? ` (last error: ${String(last)})` : ''}`);
+  throw new Error(
+    `Timed out after ${timeout}ms waiting for: ${message}${last ? ` (last error: ${String(last)})` : ''}`,
+  );
 }
 
 /** Add an auth cookie to the current browser context. */
 export async function setAuthCookie(
-  locatorOwner: { context(): { addCookies(cookies: { name: string; value: string; domain: string; path: string }[]): Promise<void> } },
+  locatorOwner: {
+    context(): {
+      addCookies(
+        cookies: { name: string; value: string; domain: string; path: string }[],
+      ): Promise<void>;
+    };
+  },
   name: string,
   value: string,
   domain: string,

@@ -44,6 +44,27 @@ const envSchema = z.object({
     .default('false')
     .transform((v) => v === 'true' || v === '1'),
 
+  // --- Self-healing (Redis ioredis + LLM) ---
+  // The self-healing Redis cache uses ioredis over a Redis URI (upstash://… or
+  // redis://…). Defaults to the Upstash REST host + token so the same database
+  // works for both the HTTP helper and the healing cache when no URI is set.
+  HEALING_REDIS_URL: z.string().default(''),
+  HEALING_REDIS_PASSWORD: z.string().default(''),
+  // DeepSeek is OpenAI-API-compatible, so the `openai` SDK is reused against
+  // DeepSeek's base URL. An empty key disables Tier 3/4 healing.
+  DEEPSEEK_API_KEY: z.string().default(''),
+  DEEPSEEK_MODEL: z.string().default('deepseek-chat'),
+  DEEPSEEK_BASE_URL: z.string().default('https://api.deepseek.com'),
+  HEALING_CONFIDENCE_THRESHOLD: z.coerce.number().min(0).max(1).default(0.8),
+  HEALING_TIMEOUT_MS: z.coerce.number().int().positive().default(2_500),
+  // `deepseek` uses the real LLM; `stub` returns a deterministic queued repair so
+  // CI can exercise Tiers 2-4 with no network and no tokens.
+  HEALING_PROVIDER: z.enum(['deepseek', 'stub']).default('deepseek'),
+  HEALING_STUB_SELECTOR: z.string().default(''),
+  HEALING_STUB_CONFIDENCE: z.coerce.number().min(0).max(1).default(0.95),
+  // Per-key expiry for the healing cache. 0 or -1 disables expiry (D3).
+  HEALING_CACHE_TTL_SECONDS: z.coerce.number().int().default(604_800),
+
   // --- Reporting ---
   REPORT_OPEN: z.enum(['always', 'never', 'on-failure']).default('never'),
 });
@@ -89,6 +110,19 @@ export const env = {
     token: raw.REDIS_TOKEN,
     prefix: raw.REDIS_KEY_PREFIX,
     flushOnStart: raw.REDIS_FLUSH_ON_START,
+  },
+  healing: {
+    redisUrl: raw.HEALING_REDIS_URL,
+    redisPassword: raw.HEALING_REDIS_PASSWORD,
+    deepseekApiKey: raw.DEEPSEEK_API_KEY,
+    deepseekModel: raw.DEEPSEEK_MODEL,
+    deepseekBaseUrl: raw.DEEPSEEK_BASE_URL.replace(/\/+$/, ''),
+    confidenceThreshold: raw.HEALING_CONFIDENCE_THRESHOLD,
+    timeoutMs: raw.HEALING_TIMEOUT_MS,
+    provider: raw.HEALING_PROVIDER,
+    stubSelector: raw.HEALING_STUB_SELECTOR,
+    stubConfidence: raw.HEALING_STUB_CONFIDENCE,
+    cacheTtlSeconds: raw.HEALING_CACHE_TTL_SECONDS,
   },
 } as const;
 

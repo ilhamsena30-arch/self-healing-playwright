@@ -53,12 +53,22 @@ export default defineConfig({
     {
       name: 'chromium',
       use: { ...devices['Desktop Chrome'] },
-      testIgnore: [/global\.setup\.ts/, /global\.teardown\.ts/, /.*\.api\.spec\.ts/],
+      testIgnore: [
+        /global\.setup\.ts/,
+        /global\.teardown\.ts/,
+        /.*\.api\.spec\.ts/,
+        /.*\.unit\.spec\.ts/,
+      ],
     },
     {
       name: 'firefox',
       use: { ...devices['Desktop Firefox'] },
-      testIgnore: [/global\.setup\.ts/, /global\.teardown\.ts/, /.*\.api\.spec\.ts/],
+      testIgnore: [
+        /global\.setup\.ts/,
+        /global\.teardown\.ts/,
+        /.*\.api\.spec\.ts/,
+        /.*\.unit\.spec\.ts/,
+      ],
     },
     {
       name: 'api',
@@ -75,7 +85,13 @@ export default defineConfig({
 
   reporter: [
     ['list'],
-    ['html', { outputFolder: 'playwright-report', open: env.reportOpen as 'always' | 'never' | 'on-failure' }],
+    [
+      'html',
+      {
+        outputFolder: 'playwright-report',
+        open: env.reportOpen as 'always' | 'never' | 'on-failure',
+      },
+    ],
     ['json', { outputFile: 'test-results/results.json' }],
   ],
 });

@@ -37,3 +37,7 @@ pnpm-debug.log*
 coverage/
 # Playwright CLI output (may contain credentials)
 .playwright-cli/
+
+# self-healing audit log (regenerated each run)
+self-healing-report.json
+self-healing-report.jsonl
